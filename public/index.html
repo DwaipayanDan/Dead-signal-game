@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#10171a">
+<title>DEAD SIGNAL — 3D Survival</title>
+<style>
+:root{--lime:#c8ff6b;--panel:rgba(8,14,17,.78);--line:rgba(200,255,107,.35)}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#10171a;color:#eef4ee;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;touch-action:none}
+#game{position:fixed;inset:0}canvas{display:block;width:100%;height:100%}
+#vignette{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 35%,rgba(0,0,0,.42) 100%)}
+.hud{position:fixed;inset:0;pointer-events:none}
+.top{position:absolute;top:env(safe-area-inset-top,8px);left:10px;right:10px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.brand{font-weight:900;letter-spacing:.15em;font-size:clamp(12px,2.4vw,17px);text-shadow:0 2px 8px #000}
+.brand small{display:block;color:var(--lime);font-size:9px;letter-spacing:.25em}
+.pill{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 10px;backdrop-filter:blur(8px);font-size:11px}
+#objective{position:absolute;top:62px;left:10px;max-width:min(72vw,320px);padding:10px 12px;background:var(--panel);border-left:3px solid var(--lime);border-radius:4px;font-size:12px;line-height:1.4}
+#objective strong{display:block;color:var(--lime);font-size:10px;letter-spacing:.14em;margin-bottom:3px}
+#toast{position:absolute;top:26%;left:50%;transform:translateX(-50%);max-width:88vw;text-align:center;background:rgba(6,10,12,.86);border:1px solid var(--line);padding:10px 16px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .2s}
+#toast.show{opacity:1}
+#bottom{position:absolute;left:10px;right:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 10px);display:flex;justify-content:space-between;align-items:flex-end;gap:8px}
+.statbox{background:var(--panel);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:8px 10px;min-width:105px;font-size:10px}
+.bar{height:5px;background:#293237;border-radius:4px;margin-top:5px;overflow:hidden}.bar span{display:block;height:100%;background:var(--lime);width:100%}
+#weapon{font-size:11px;font-weight:800;letter-spacing:.06em}#ammo{color:var(--lime);font-variant-numeric:tabular-nums}
+.controls{pointer-events:auto;display:flex;align-items:flex-end;gap:9px}
+#stick{width:124px;height:124px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.22);position:relative;touch-action:none;display:none}
+#nub{width:46px;height:46px;border-radius:50%;background:rgba(200,255,107,.55);border:2px solid rgba(255,255,255,.8);position:absolute;left:38px;top:38px}
+.actions{display:flex;align-items:flex-end;gap:8px}
+.action{width:57px;height:57px;border-radius:50%;background:rgba(10,17,20,.72);border:1px solid rgba(200,255,107,.55);color:#fff;font-weight:800;font-size:10px;touch-action:none;display:flex;align-items:center;justify-content:center;text-align:center;user-select:none}
+.action.big{width:68px;height:68px;background:rgba(200,255,107,.18);font-size:11px}
+#startscreen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(110deg,rgba(3,8,10,.92),rgba(3,8,10,.45)),radial-gradient(ellipse at 70% 45%,#34483c,#10171a 60%);z-index:5}
+.card{width:min(550px,100%);padding:clamp(20px,5vw,34px);border:1px solid var(--line);background:rgba(7,13,15,.83);border-radius:16px;box-shadow:0 20px 80px #0008}
+.kicker{color:var(--lime);font-size:10px;letter-spacing:.3em;font-weight:900}
+h1{font-size:clamp(36px,9vw,66px);line-height:.95;margin:12px 0 10px;letter-spacing:-.055em}
+h1 span{color:var(--lime)}.sub{color:#c2cfca;line-height:1.55;font-size:14px}
+.row{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+input{min-width:0;flex:1;background:#121d20;border:1px solid #405047;color:white;border-radius:8px;padding:12px;font-size:14px}
+button{background:var(--lime);border:0;color:#111914;font-weight:900;letter-spacing:.08em;border-radius:8px;padding:13px 16px;cursor:pointer}
+button.secondary{background:#263336;color:#e9f3eb;border:1px solid #50615b}
+#startbtn{width:100%;margin-top:12px}
+.note{font-size:11px;color:#93a39b;line-height:1.5;margin-top:14px}
+#joincode{width:100%;margin-top:8px;display:none}
+#mobilehint{display:none}
+@media(pointer:coarse){#stick{display:block}#mobilehint{display:block}}
+@media(max-width:450px){#objective{top:59px;font-size:11px}#stick{width:105px;height:105px}#nub{left:30px;top:30px;width:43px;height:43px}.action{width:49px;height:49px}.action.big{width:60px;height:60px}.statbox{min-width:88px;padding:7px 8px}}
+</style>
+</head>
+<body>
+<div id="game"></div><div id="vignette"></div>
+<div class="hud" id="hud" style="display:none">
+ <div class="top">
+  <div class="brand">DEAD SIGNAL<small>DAY <span id="day">01</span> / 15 · KITA ISLAND</small></div>
+  <div class="pill">SURVIVORS <b id="players">1</b> &nbsp;·&nbsp; ZOMBIES <b id="zcount">0</b></div>
+ </div>
+ <div id="objective"><strong>MISSION OBJECTIVE</strong><span id="objtext">Reach the town and search for supplies.</span></div>
+ <div id="toast"></div>
+ <div id="bottom">
+  <div class="statbox"><div>VITALS <b id="hptext">100%</b></div><div class="bar"><span id="hpbar"></span></div><div style="margin-top:6px;color:#9ba9a2">STAMINA <b id="stamina">100%</b></div></div>
+  <div class="statbox"><div id="weapon">SERVICE PISTOL</div><div style="margin-top:5px">AMMO <b id="ammo">12 / ∞</b></div><div style="margin-top:5px;color:#9ba9a2" id="dayevent">SIGNAL LOST</div></div>
+  <div class="controls">
+   <div id="stick"><div id="nub"></div></div>
+   <div class="actions">
+    <div class="action" id="interact">USE<br>ITEM</div>
+    <div class="action" id="sprint">SPRINT</div>
+    <div class="action big" id="fire">FIRE</div>
+   </div>
+  </div>
+ </div>
+</div>
+<div id="startscreen">
+ <div class="card">
+  <div class="kicker">CO-OP ZOMBIE SURVIVAL · BROWSER PROTOTYPE</div>
+  <h1>DEAD<br><span>SIGNAL</span></h1>
+  <p class="sub">Kita Island. 300 km from mainland Japan. Communications are dead. Your boat is gone. Rescue is expected in 15 days — if you can survive until then.</p>
+  <div class="row"><input id="playername" maxlength="18" placeholder="Survivor callsign" value="Survivor"><input id="room" maxlength="12" placeholder="Room code" value="KITA01" style="max-width:120px;text-transform:uppercase"></div>
+  <div class="row"><button class="secondary" id="hostbtn" style="flex:1">HOST / SOLO</button><button class="secondary" id="joinbtn" style="flex:1">JOIN ROOM</button></div>
+  <button id="startbtn">DEPLOY TO DAY 01</button>
+  <div class="note">Mobile: use the left stick to move; FIRE shoots toward the screen centre; USE interacts. Desktop: WASD to move, mouse to aim, click to fire, E to interact, Shift to sprint. For friends, run the included server and share its public URL + room code. This is a playable prototype, not a finished commercial game.</div>
+  <div class="note" id="netstatus">NETWORK: checking…</div>
+ </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+(()=>{
+'use strict';
+const $=id=>document.getElementById(id);
+let scene,camera,renderer,clock,player,gun,world=[],zombies=[],otherPlayers=new Map(),loot=[],socket=null,started=false,online=false,room='KITA01',myId=null;
+let hp=100,ammo=12,day=1,stamina=100,kills=0,elapsed=0,fireCooldown=0,toastTimer=0,objectiveIndex=0,hasKey=false,hasMedkit=false;
+const keys={},joy={x:0,y:0},camTarget=new THREE.Vector3(),forward=new THREE.Vector3(),right=new THREE.Vector3();
+const objectives=[
+'Explore the harbour district. Find supplies before nightfall.',
+'Search the abandoned clinic for medical supplies.',
+'Reach the police kiosk and recover the emergency radio.',
+'Restore power to the coastal transmitter.',
+'Find shelter in the hotel. Reinforce the entrance.',
+'Scavenge food, ammo, and fuel. Avoid the infected.',
+'Reach the hilltop relay station and send a distress burst.',
+'Survive the night. The infected are becoming more aggressive.',
+'Find a working vehicle and collect fuel.',
+'Search the ferry terminal for a mainland route.',
+'Recover the military supply crate near the forest road.',
+'Protect your shelter during the horde.',
+'Climb the radio mast and boost the signal.',
+'Hold the evacuation zone until the rescue window opens.',
+'Reach the coast. Rescue helicopter inbound.'
+];
+function toast(msg){$('toast').textContent=msg;$('toast').classList.add('show');toastTimer=3.2}
+function makeMat(color,roughness=1,metalness=0){return new THREE.MeshStandardMaterial({color,roughness,metalness})}
+function box(w,h,d,mat,x,y,z,cast=true){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);m.castShadow=cast;m.receiveShadow=true;scene.add(m);world.push(m);return m}
+function cylinder(rt,rb,h,mat,x,y,z,segments=8){const m=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,segments),mat);m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;scene.add(m);world.push(m);return m}
+function makeCharacter(color=0x384c46){
+ const g=new THREE.Group();const bodyMat=makeMat(color),skin=makeMat(0xb78c70),dark=makeMat(0x202a2b),pants=makeMat(0x252e32);
+ const torso=new THREE.Mesh(new THREE.CapsuleGeometry(.32,.52,4,8),bodyMat);torso.position.y=1.15;torso.castShadow=true;g.add(torso);
+ const head=new THREE.Mesh(new THREE.SphereGeometry(.22,12,10),skin);head.position.y=1.78;head.castShadow=true;g.add(head);
+ const hair=new THREE.Mesh(new THREE.SphereGeometry(.225,10,7,0,Math.PI*2,0,Math.PI*.58),dark);hair.position.y=1.84;g.add(hair);
+ for(const s of [-1,1]){const leg=new THREE.Mesh(new THREE.CapsuleGeometry(.12,.48,3,6),pants);leg.position.set(s*.16,.48,0);leg.castShadow=true;g.add(leg);const arm=new THREE.Mesh(new THREE.CapsuleGeometry(.105,.43,3,6),skin);arm.position.set(s*.38,1.17,-.02);arm.rotation.z=s*.14;arm.castShadow=true;g.add(arm)}
+ const pack=new THREE.Mesh(new THREE.BoxGeometry(.42,.48,.18),makeMat(0x5c6142));pack.position.set(0,1.2,.28);g.add(pack);
+ const weapon=new THREE.Mesh(new THREE.BoxGeometry(.12,.12,.7),makeMat(0x181d20,.6,.5));weapon.position.set(.25,1.02,-.43);weapon.rotation.x=.08;g.add(weapon);
+ g.userData={weapon,bodyMat};return g;
+}
+function init3d(){
+ scene=new THREE.Scene();scene.background=new THREE.Color(0x899d9b);scene.fog=new THREE.Fog(0x899d9b,35,125);
+ camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.1,300);
+ renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;$('game').appendChild(renderer.domElement);
+ scene.add(new THREE.HemisphereLight(0xc9d9d3,0x39413a,2.0));
+ const sun=new THREE.DirectionalLight(0xffe3bd,2.5);sun.position.set(-25,40,-10);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-45;sun.shadow.camera.right=45;sun.shadow.camera.top=45;sun.shadow.camera.bottom=-45;scene.add(sun);
+ const ground= new THREE.Mesh(new THREE.PlaneGeometry(220,220),makeMat(0x536650));ground.rotation.x=-Math.PI/2;ground.position.y=-.08;ground.receiveShadow=true;scene.add(ground);
+ // Roads and coastline
+ box(8,.04,150,makeMat(0x4a4e4a),0,.01,0,false);box(140,.04,7,makeMat(0x4a4e4a),0,.015,15,false);
+ box(220,.03,18,makeMat(0x3e7779),0,-.12,-85,false);
+ for(let i=0;i<42;i++){let x=(Math.random()-.5)*150,z=(Math.random()-.5)*130;if(Math.abs(x)<7||Math.abs(z-15)<5)continue;
+  const h=1.5+Math.random()*4,w=2+Math.random()*3,d=2+Math.random()*3;
+  let mat=makeMat([0x777d78,0x938d7d,0x777e80,0x615f59][i%4]);box(w,h,d,mat,x,h/2,z);
+  box(w+.15,.18,d+.15,makeMat(i%3===0?0x3e4a45:0x474a43),x,h+.05,z);
+  // windows
+  for(let side of [-1,1]) for(let j=0;j<Math.max(1,Math.floor(h/1.3));j++){
+   const win=new THREE.Mesh(new THREE.BoxGeometry(.07,.35,.45),makeMat(0x263b3b,.35));win.position.set(x+side*(w/2+.012),.75+j*1.15,z);scene.add(win);
+  }
+ }
+ // trees and street props
+ for(let i=0;i<70;i++){const x=(Math.random()-.5)*155,z=(Math.random()-.5)*145;if(Math.abs(x)<8||Math.abs(z-15)<6)continue;
+  cylinder(.16,.25,1.7,makeMat(0x514333),x,.85,z,6);
+  const crown=new THREE.Mesh(new THREE.ConeGeometry(1.2+Math.random(),2.8+Math.random(),7),makeMat([0x344e3c,0x3b5940,0x4a6045][i%3]));crown.position.set(x,2.8,z);crown.castShadow=true;scene.add(crown);
+ }
+ // barricades near initial path
+ for(let i=0;i<12;i++){const x=-5+i*.9;box(.75,.75,.2,makeMat(i%2?0x74654c:0x5b5144),x,.38,-7+i%2*.3)}
+ // landmarks + glowing loot markers
+ addLoot(-3,-12,'MEDKIT','medkit');addLoot(4,-20,'AMMO','ammo');addLoot(13,4,'RADIO','radio');addLoot(-14,8,'KEYCARD','key');addLoot(3,24,'FUEL','fuel');
+ player=makeCharacter();player.position.set(0,0,3);scene.add(player);
+ // zombies distributed around town
+ for(let i=0;i<12;i++)spawnZombie(-22+Math.random()*44,-24+Math.random()*46);
+}
+function addLoot(x,z,label,type){
+ const group=new THREE.Group();group.position.set(x,0,z);
+ const color=type==='medkit'?0x5eff9b:type==='ammo'?0xffd05e:type==='radio'?0x76d7ff:type==='key'?0xd7d7d7:0xff894f;
+ const gem=new THREE.Mesh(new THREE.BoxGeometry(.55,.5,.45),new THREE.MeshStandardMaterial({color,emissive:color,emissiveIntensity:.45}));gem.position.y=.45;gem.castShadow=true;group.add(gem);
+ const ring=new THREE.Mesh(new THREE.TorusGeometry(.55,.035,6,24),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.85}));ring.rotation.x=Math.PI/2;ring.position.y=.08;group.add(ring);
+ scene.add(group);loot.push({group,label,type,taken:false});
+}
+function spawnZombie(x,z){const g=makeCharacter(0x657467);g.scale.set(1.03,.96,1.03);g.position.set(x,0,z);g.userData.zombie=true;scene.add(g);zombies.push({group:g,hp:2,speed:1.15+Math.random()*.45,attack:0})}
+function connect(){
+ if(typeof io!=='function'){$('netstatus').textContent='NETWORK: offline preview (server not running)';online=false;return}
+ socket=io();socket.on('connect',()=>{$('netstatus').textContent='NETWORK: connected';});
+ socket.on('connect_error',()=>{$('netstatus').textContent='NETWORK: offline preview — run server for friends';});
+ socket.on('welcome',data=>{myId=data.id;online=true;toast('ROOM '+room+' CONNECTED');});
+ socket.on('state',data=>{if(!data||!data.players)return;const alive=new Set();
+  for(const p of data.players){if(p.id===myId)continue;alive.add(p.id);let o=otherPlayers.get(p.id);if(!o){o={group:makeCharacter(0x4a6880),name:p.name};scene.add(o.group);otherPlayers.set(p.id,o)}o.group.position.set(p.x,0,p.z);o.group.rotation.y=p.rot||0;o.name=p.name;}
+  for(const [id,o] of otherPlayers){if(!alive.has(id)){scene.remove(o.group);otherPlayers.delete(id)}}
+  $('players').textContent=String(1+otherPlayers.size);
+ });
+}
+function startGame(){
+ if(started)return;started=true;room=$('room').value.trim().toUpperCase()||'KITA01';$('startscreen').style.display='none';$('hud').style.display='block';init3d();connect();
+ if(socket){socket.emit('joinRoom',{room,name:$('playername').value.trim()||'Survivor',x:0,z:3})}
+ toast('DAY 01 — THE BOAT IS GONE. FIND SHELTER.');$('objtext').textContent=objectives[0];animate();
+}
+function aimPoint(){const dir=new THREE.Vector3(0,0,-1).applyQuaternion(player.quaternion);return player.position.clone().add(dir.multiplyScalar(14))}
+function fire(){
+ if(!started||fireCooldown>0)return;if(ammo<=0){toast('MAGAZINE EMPTY');return}ammo--;fireCooldown=.28;$('ammo').textContent=ammo+' / ∞';
+ const origin=player.position.clone().add(new THREE.Vector3(0,1.1,0));const dir=new THREE.Vector3(0,0,-1).applyQuaternion(player.quaternion).normalize();
+ let hit=null,dist=18;
+ for(const z of zombies){if(z.hp<=0)continue;const target=z.group.position.clone().add(new THREE.Vector3(0,1,0));const v=target.sub(origin);const d=v.length();if(d>dist)continue;v.normalize();if(v.dot(dir)>.965){hit=z;dist=d}}
+ // little muzzle flash
+ const flash=new THREE.PointLight(0xffd48a,4,5);flash.position.copy(origin).add(dir.clone().multiplyScalar(.7));scene.add(flash);setTimeout(()=>scene.remove(flash),55);
+ if(hit){hit.hp--;hit.group.traverse(o=>{if(o.material&&o.material.emissive){o.material.emissive.setHex(0x8f1717);o.material.emissiveIntensity=.8}});if(hit.hp<=0){scene.remove(hit.group);kills++;toast('INFECTED ELIMINATED');$('zcount').textContent=String(Math.max(0,zombies.filter(z=>z.hp>0).length))}}
+}
+function interact(){
+ if(!started)return;let closest=null,dist=3.2;
+ for(const l of loot){if(l.taken)continue;const d=l.group.position.distanceTo(player.position);if(d<dist){closest=l;dist=d}}
+ if(closest){closest.taken=true;scene.remove(closest.group);if(closest.type==='medkit'){hp=Math.min(100,hp+35);hasMedkit=true;toast('MEDKIT COLLECTED · VITALS RESTORED')}else if(closest.type==='ammo'){ammo+=12;toast('AMMO +12')}else if(closest.type==='key'){hasKey=true;toast('HOTEL KEYCARD ACQUIRED')}else if(closest.type==='radio'){objectiveIndex=Math.max(objectiveIndex,2);toast('EMERGENCY RADIO FOUND · DAY 01 OBJECTIVE UPDATED')}else{toast('FUEL CANISTER COLLECTED')}updateObjective();return}
+ // Day progression on mission interaction
+ if(objectiveIndex<14){objectiveIndex++;day=Math.min(15,Math.floor(objectiveIndex)+1);$('day').textContent=String(day).padStart(2,'0');updateObjective();toast('OBJECTIVE UPDATED · DAY '+String(day).padStart(2,'0'))}
+ else{toast('HOLD THE COAST — RESCUE IS NEAR')}
+}
+function updateObjective(){ $('objtext').textContent=objectives[Math.min(objectiveIndex,14)];$('dayevent').textContent=objectiveIndex<4?'SIGNAL LOST':objectiveIndex<10?'INFECTED NEARBY':'RESCUE WINDOW'; }
+function update(dt){
+ elapsed+=dt;fireCooldown=Math.max(0,fireCooldown-dt);if(toastTimer>0){toastTimer-=dt;if(toastTimer<=0)$('toast').classList.remove('show')}
+ const moveX=(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0)+joy.x;
+ const moveZ=(keys.KeyS||keys.ArrowDown?1:0)-(keys.KeyW||keys.ArrowUp?1:0)+joy.y;
+ const moving=Math.abs(moveX)+Math.abs(moveZ)>.08;const sprint=keys.ShiftLeft||keys.ShiftRight||touchSprint;
+ if(moving){const len=Math.hypot(moveX,moveZ)||1;const dx=moveX/len,dz=moveZ/len;const speed=sprint&&stamina>1?7.5:4.3;player.position.x+=dx*speed*dt;player.position.z+=dz*speed*dt;player.rotation.y=Math.atan2(-dx,-dz);stamina=Math.max(0,stamina-(sprint?24:-12)*dt)}
+ else stamina=Math.min(100,stamina+15*dt);
+ player.position.x=THREE.MathUtils.clamp(player.position.x,-66,66);player.position.z=THREE.MathUtils.clamp(player.position.z,-62,63);
+ // zombie AI follows nearest player
+ for(const z of zombies){if(z.hp<=0)continue;const v=player.position.clone().sub(z.group.position);const d=v.length();z.group.rotation.y=Math.atan2(-v.x,-v.z);if(d>1.45){v.normalize();z.group.position.addScaledVector(v,z.speed*dt)}else{z.attack-=dt;if(z.attack<=0){z.attack=1.25;hp=Math.max(0,hp-6);if(hp<=0){hp=65;player.position.set(0,0,3);toast('DOWNED — DRAGGED BACK TO THE SAFE STREET');}}}}
+ for(const l of loot){if(!l.taken){l.group.rotation.y+=dt*.6;l.group.position.y=.05+Math.sin(elapsed*2+l.group.position.x)*.07}}
+ // Camera over shoulder
+ const desired=new THREE.Vector3(0,4.4,7.5).applyAxisAngle(new THREE.Vector3(0,1,0),player.rotation.y);
+ camera.position.lerp(player.position.clone().add(desired),1-Math.pow(.001,dt));camTarget.copy(player.position).add(new THREE.Vector3(0,1.25,0));camera.lookAt(camTarget);
+ $('hptext').textContent=hp+'%';$('hpbar').style.width=hp+'%';$('stamina').textContent=Math.round(stamina)+'%';
+ if(socket&&socket.connected&&elapsed%0.08<dt)socket.emit('move',{x:player.position.x,z:player.position.z,rot:player.rotation.y});
+}
+let touchSprint=false;
+function animate(){if(!started)return;requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.05);update(dt);renderer.render(scene,camera)}
+clock={last:performance.now(),getDelta(){const n=performance.now(),d=(n-this.last)/1000;this.last=n;return d}}
+$('hostbtn').onclick=()=>{ $('room').value=($('room').value||'KITA01').toUpperCase();toast('ROOM CODE SET — SHARE IT WITH FRIENDS')};
+$('joinbtn').onclick=()=>{ $('room').value=($('room').value||'KITA01').toUpperCase();toast('JOINING ROOM '+$('room').value)};
+$('startbtn').onclick=startGame;
+$('fire').addEventListener('pointerdown',e=>{e.preventDefault();fire()});
+$('interact').addEventListener('pointerdown',e=>{e.preventDefault();interact()});
+$('sprint').addEventListener('pointerdown',e=>{e.preventDefault();touchSprint=true});
+for(const ev of ['pointerup','pointercancel','pointerleave'])$('sprint').addEventListener(ev,()=>touchSprint=false);
+window.addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='KeyE')interact();if(e.code==='Space'){e.preventDefault();fire()}});
+window.addEventListener('keyup',e=>keys[e.code]=false);
+const stick=$('stick'),nub=$('nub');let stickPointer=null;
+stick.addEventListener('pointerdown',e=>{stickPointer=e.pointerId;stick.setPointerCapture(e.pointerId);moveStick(e)});
+stick.addEventListener('pointermove',e=>{if(e.pointerId===stickPointer)moveStick(e)});
+function moveStick(e){const r=stick.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;let dx=e.clientX-cx,dy=e.clientY-cy;const max=r.width*.32,len=Math.hypot(dx,dy);if(len>max){dx=dx/len*max;dy=dy/len*max}joy.x=dx/max;joy.y=dy/max;nub.style.left=(r.width/2-23+dx)+'px';nub.style.top=(r.height/2-23+dy)+'px'}
+function releaseStick(){stickPointer=null;joy.x=joy.y=0;nub.style.left='calc(50% - 23px)';nub.style.top='calc(50% - 23px)'}
+stick.addEventListener('pointerup',releaseStick);stick.addEventListener('pointercancel',releaseStick);
+window.addEventListener('resize',()=>{if(camera&&renderer){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)}});
+if(typeof io==='function')$('netstatus').textContent='NETWORK: multiplayer server available';else $('netstatus').textContent='NETWORK: start server for online co-op';
+})();
+</script>
+</body></html>
